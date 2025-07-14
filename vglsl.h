@@ -1,5 +1,5 @@
 /*
- * VGLSL - A C99 single header GLSL Preproc Extension library
+ * VGLSL - A C99 single header GLSL Preproccessor Extension library
  * Made for Vantor Engine (https://github.com/LukasRennhofer/Vantor)
  * 
  * Copyright (c) 2025 Lukas Rennhofer (https://github.com/LukasRennhofer)
