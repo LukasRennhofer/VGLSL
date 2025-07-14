@@ -8,9 +8,10 @@ A C99 single-header GLSL Extension library that extends GLSL with powerful prepr
 
 Originally developed for the [Vantor Engine](https://github.com/LukasRennhofer/Vantor), VGLSL provides essential preprocessing features missing from standard GLSL, making shader development more modular and maintainable.
 
-## ✨ Features
+## Features
 
 - **Include System** - `#include` directive support with relative path resolution
+- **Virtual Include Paths** - Map virtual paths to real directories (`#include <Vantor/Shader.vglsl>`)
 - **Macro System** - Simple defines and function-like macros with parameters
 - **Conditional Compilation** - `#ifdef`, `#ifndef`, `#else`, `#endif` support
 - **Comment Removal** - Automatic removal of line (`//`) and block (`/* */`) comments
@@ -67,6 +68,9 @@ VglslResult result = vglsl_parse_file_ex("main.vglsl", &config);
 | `vglsl_parse_memory_ex(source, filename, config)` | Parse memory with custom config |
 | `vglsl_free_result(result)` | Free result memory |
 | `vglsl_default_config()` | Get default configuration |
+| `vglsl_add_virtual_include_path(virtual_name, real_path)` | Map virtual path to real directory |
+| `vglsl_remove_virtual_include_path(virtual_name)` | Remove virtual path mapping |
+| `vglsl_clear_virtual_include_paths()` | Clear all virtual path mappings |
 
 ## GLSL Extensions
 
@@ -157,6 +161,32 @@ if (!result.success) {
 vglsl_free_result(&result);
 ```
 
+### Virtual Include Paths
+
+Virtual include paths allow you to map logical names to physical directories, making your shader code more organized and portable.
+
+```c
+// Setup virtual include paths
+vglsl_add_virtual_include_path("Vantor", "/path/to/vantor/shaders");
+vglsl_add_virtual_include_path("Engine", "/path/to/engine/shaders");
+vglsl_add_virtual_include_path("Game", "/path/to/game/shaders");
+
+// Process Shader files ...
+
+// Clear all virtual paths
+vglsl_clear_virtual_include_paths();
+```
+
+Now you can use angle bracket includes with virtual paths:
+
+```glsl
+#version 330 core
+
+// Virtual includes (resolved using registered paths)
+#include <Vantor/VLighting.vglsl>      // -> /path/to/vantor/shaders/VLighting.vglsl
+#include <Engine/Transform.vglsl>      // -> /path/to/engine/shaders/Transform.vglsl
+#include <Game/PlayerEffects.vglsl>    // -> /path/to/game/shaders/PlayerEffects.vglsl
+```
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.

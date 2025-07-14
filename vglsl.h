@@ -1,5 +1,5 @@
 /*
- * VGLSL - A C99 single header GLSL Extension library
+ * VGLSL - A C99 single header GLSL Preproc Extension library
  * Made for Vantor Engine (https://github.com/LukasRennhofer/Vantor)
  * 
  * Copyright (c) 2025 Lukas Rennhofer (https://github.com/LukasRennhofer)
@@ -72,6 +72,11 @@ void vglsl_free_result(VglslResult* result);
 /* Get default configuration */
 VglslConfig vglsl_default_config(void);
 
+/* Virtual include paths support */
+void vglsl_add_virtual_include_path(const char* virtual_name, const char* real_path);
+void vglsl_remove_virtual_include_path(const char* virtual_name);
+void vglsl_clear_virtual_include_paths(void);
+
 /* ========================================================================= */
 /* IMPLEMENTATION                                                            */
 /* ========================================================================= */
@@ -94,6 +99,10 @@ VglslConfig vglsl_default_config(void);
 #define VGLSL_MAX_OUTPUT_SIZE (1024 * 1024) /* 1MB default */
 #endif
 
+#ifndef VGLSL_MAX_VIRTUAL_PATHS
+#define VGLSL_MAX_VIRTUAL_PATHS 32
+#endif
+
 #ifndef VGLSL_MALLOC
 #define VGLSL_MALLOC malloc
 #endif
@@ -105,6 +114,16 @@ VglslConfig vglsl_default_config(void);
 #ifndef VGLSL_REALLOC
 #define VGLSL_REALLOC realloc
 #endif
+
+/* Virtual include path structure */
+typedef struct VglslVirtualPath {
+    char* virtual_name;   /* e.g., "Vantor" */
+    char* real_path;      /* e.g., "/path/to/vantor/shaders" */
+} VglslVirtualPath;
+
+/* Global virtual include paths storage */
+static VglslVirtualPath g_virtual_paths[VGLSL_MAX_VIRTUAL_PATHS];
+static int g_virtual_path_count = 0;
 
 /* Internal structures */
 typedef struct VglslDefine {
@@ -147,6 +166,7 @@ static bool vglsl_append_output(VglslContext* ctx, const char* text);
 static void vglsl_set_error(VglslContext* ctx, const char* message, int line, const char* filename);
 static char* vglsl_read_file(const char* filename);
 static void vglsl_cleanup_context(VglslContext* ctx);
+static const char* vglsl_resolve_virtual_path(const char* include_path);
 
 /* Utility functions */
 static char* vglsl_strdup(const char* str) {
@@ -431,13 +451,16 @@ static bool vglsl_process_include(VglslContext* ctx, const char* directive, int 
     const char* angle_start = strchr(directive, '<');
     const char* start = NULL;
     char end_char = 0;
+    bool is_angle_include = false;
     
     if (quote_start && (!angle_start || quote_start < angle_start)) {
         start = quote_start + 1;
         end_char = '"';
+        is_angle_include = false;
     } else if (angle_start) {
         start = angle_start + 1;
         end_char = '>';
+        is_angle_include = true;
     }
     
     if (!start) {
@@ -463,10 +486,27 @@ static bool vglsl_process_include(VglslContext* ctx, const char* directive, int 
     
     /* Build full path */
     char full_path[1024];
-    if (ctx->config->base_path) {
-        snprintf(full_path, sizeof(full_path), "%s/%s", ctx->config->base_path, include_filename);
+    
+    /* Handle angle bracket includes with virtual paths */
+    if (is_angle_include) {
+        const char* resolved_virtual = vglsl_resolve_virtual_path(include_filename);
+        if (resolved_virtual) {
+            strcpy(full_path, resolved_virtual);
+        } else {
+            /* Fallback to base_path for angle includes without virtual mapping */
+            if (ctx->config->base_path) {
+                snprintf(full_path, sizeof(full_path), "%s/%s", ctx->config->base_path, include_filename);
+            } else {
+                strcpy(full_path, include_filename);
+            }
+        }
     } else {
-        strcpy(full_path, include_filename);
+        /* Handle quoted includes normally with base_path */
+        if (ctx->config->base_path) {
+            snprintf(full_path, sizeof(full_path), "%s/%s", ctx->config->base_path, include_filename);
+        } else {
+            strcpy(full_path, include_filename);
+        }
     }
     
     /* Read and process included file */
@@ -832,6 +872,79 @@ void vglsl_free_result(VglslResult* result) {
     
     result->success = false;
     result->error_line = 0;
+}
+
+/* Virtual include path management functions */
+void vglsl_add_virtual_include_path(const char* virtual_name, const char* real_path) {
+    if (!virtual_name || !real_path || g_virtual_path_count >= VGLSL_MAX_VIRTUAL_PATHS) {
+        return;
+    }
+    
+    /* Check if virtual name already exists and update it */
+    for (int i = 0; i < g_virtual_path_count; i++) {
+        if (strcmp(g_virtual_paths[i].virtual_name, virtual_name) == 0) {
+            VGLSL_FREE(g_virtual_paths[i].real_path);
+            g_virtual_paths[i].real_path = vglsl_strdup(real_path);
+            return;
+        }
+    }
+    
+    /* Add new virtual path */
+    g_virtual_paths[g_virtual_path_count].virtual_name = vglsl_strdup(virtual_name);
+    g_virtual_paths[g_virtual_path_count].real_path = vglsl_strdup(real_path);
+    g_virtual_path_count++;
+}
+
+void vglsl_remove_virtual_include_path(const char* virtual_name) {
+    if (!virtual_name) return;
+    
+    for (int i = 0; i < g_virtual_path_count; i++) {
+        if (strcmp(g_virtual_paths[i].virtual_name, virtual_name) == 0) {
+            VGLSL_FREE(g_virtual_paths[i].virtual_name);
+            VGLSL_FREE(g_virtual_paths[i].real_path);
+            
+            /* Shift remaining entries down */
+            for (int j = i; j < g_virtual_path_count - 1; j++) {
+                g_virtual_paths[j] = g_virtual_paths[j + 1];
+            }
+            g_virtual_path_count--;
+            return;
+        }
+    }
+}
+
+void vglsl_clear_virtual_include_paths(void) {
+    for (int i = 0; i < g_virtual_path_count; i++) {
+        VGLSL_FREE(g_virtual_paths[i].virtual_name);
+        VGLSL_FREE(g_virtual_paths[i].real_path);
+    }
+    g_virtual_path_count = 0;
+}
+
+/* Resolve virtual include path */
+static const char* vglsl_resolve_virtual_path(const char* include_path) {
+    if (!include_path) return NULL;
+    
+    /* Find the first slash to separate virtual folder from relative path */
+    const char* slash = strchr(include_path, '/');
+    if (!slash) return NULL;
+    
+    size_t virtual_name_len = slash - include_path;
+    
+    /* Check if this matches any virtual path */
+    for (int i = 0; i < g_virtual_path_count; i++) {
+        if (strlen(g_virtual_paths[i].virtual_name) == virtual_name_len &&
+            strncmp(g_virtual_paths[i].virtual_name, include_path, virtual_name_len) == 0) {
+            
+            /* Build full path: real_path + remaining_path */
+            static char resolved_path[1024];
+            snprintf(resolved_path, sizeof(resolved_path), "%s%s", 
+                    g_virtual_paths[i].real_path, slash);
+            return resolved_path;
+        }
+    }
+    
+    return NULL;
 }
 
 #endif /* VGLSL_IMPLEMENTATION */

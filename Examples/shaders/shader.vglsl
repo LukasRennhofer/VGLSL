@@ -1,6 +1,6 @@
 #version 330 core
 
-#include "common.vglsl"
+#include <Vantor/VCommon.vglsl>
 
 in vec3 v_worldPos;
 in vec3 v_normal;

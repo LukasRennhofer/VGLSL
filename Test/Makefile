@@ -18,10 +18,6 @@ test_vglsl: test_vglsl.c ../vglsl.h
 test_file_parsing: test_file_parsing.c ../vglsl.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-# Build edge case tests
-test_edge_cases: test_edge_cases.c ../vglsl.h
-	$(CC) $(CFLAGS) -o $@ $<
-
 # Run all tests
 test: run-tests
 

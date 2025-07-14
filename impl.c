@@ -2,6 +2,8 @@
 #include "vglsl.h"
 
 int main() {
+
+    vglsl_add_virtual_include_path("Vantor", "Examples/Vantor");
     // Parse a shader file with includes
     VglslResult result = vglsl_parse_file("Examples/shaders/shader.vglsl", "Examples/shaders/");
     
@@ -15,6 +17,8 @@ int main() {
                 result.error_file, result.error_line, result.error_message);
         vglsl_free_result(&result);
     }
+
+    vglsl_clear_virtual_include_paths();
     
     return 0;
 }
