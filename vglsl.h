@@ -253,15 +253,22 @@ static bool vglsl_append_output(VglslContext* ctx, const char* text) {
     size_t text_len = strlen(text);
     size_t needed = ctx->output_size + text_len + 1;
     
-    if (needed > ctx->config->max_output_size) {
-        vglsl_set_error(ctx, "Output size exceeded maximum limit", 0, "");
-        return false;
-    }
-    
+    /* Check if we need to reallocate */
     if (needed > ctx->output_capacity) {
+        /* Calculate new capacity, doubling current capacity or ensuring we have enough space */
         size_t new_capacity = ctx->output_capacity * 2;
         if (new_capacity < needed) new_capacity = needed * 2;
-        if (new_capacity > ctx->config->max_output_size) new_capacity = ctx->config->max_output_size;
+        
+        /* Check if new capacity would exceed the maximum allowed size */
+        if (new_capacity > ctx->config->max_output_size) {
+            new_capacity = ctx->config->max_output_size;
+        }
+        
+        /* If even the maximum allowed size is not enough, fail */
+        if (needed > new_capacity) {
+            vglsl_set_error(ctx, "Output size exceeded maximum limit", 0, "");
+            return false;
+        }
         
         char* new_output = (char*)VGLSL_REALLOC(ctx->output, new_capacity);
         if (!new_output) {

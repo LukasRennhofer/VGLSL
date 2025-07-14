@@ -133,7 +133,8 @@ void main() {
 ```c
 #define VGLSL_MAX_LINE_LENGTH 4096      // Max line length
 #define VGLSL_MAX_INCLUDE_DEPTH 32      // Max include depth
-#define VGLSL_MAX_DEFINES 256           // Max macro definitions
+#define VGLSL_MAX_VIRTUAL_PATHS 32      // Max virtual includes
+#define VGLSL_MAX_DEFINES 256            // Max macro definitions
 #define VGLSL_MAX_OUTPUT_SIZE (1024*1024) // Max output size
 
 // Custom memory allocators
